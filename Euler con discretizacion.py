@@ -20,7 +20,8 @@ Hd_RESERVORIO = 15.0
 #Hd_RESERVORIO = 20.0
 #Hd_RESERVORIO = 2.0
 
-DISCRETIZACION = 0.25
+DISCRETIZACION = 0.5
+
 # Leer datos de caudal ingresante (Qin) del archivo
 data = np.loadtxt('Qin.txt', skiprows=1)
 HORA = data[:, 0]
@@ -49,6 +50,7 @@ def resolver_euler(tiempo, lista_volumenes, lista_niveles, lista_Qouts, lista_Qi
             Qout = (2 / 3) * CW * LARGO_VERTEDERO * np.sqrt(2 * GRAVEDAD) * h ** (3 / 2)
 
 
+
         # Actualizar volumen y nivel de agua
         V = V + delta_t * (Qin_Ahora - Qout)
         H = V / AREA_RESERVORIO
@@ -57,7 +59,7 @@ def resolver_euler(tiempo, lista_volumenes, lista_niveles, lista_Qouts, lista_Qi
 
 
         # Una vez lleno, el nivel de agua no puede bajar de 15 m
-        if H < Hd_RESERVORIO and lista_niveles[-1] >= Hd_RESERVORIO:
+        if H < Hd_RESERVORIO <= lista_niveles[i-1]:
             H = Hd_RESERVORIO
             V = H * AREA_RESERVORIO
 
@@ -67,6 +69,66 @@ def resolver_euler(tiempo, lista_volumenes, lista_niveles, lista_Qouts, lista_Qi
         lista_factores_amplificacion.append(g)
         lista_volumenes.append(int(V))
         lista_niveles.append(round(H,2))
+        lista_Qouts.append(Qout)
+    return 0
+
+def resolver_heun(tiempo, lista_volumenes, lista_niveles, lista_Qouts, lista_Qin, lista_factores_amplificacion, discretizacion):
+    H_sig = H_INICIAL
+    V_sig = VOLUMEN_INICIAL
+    delta_t = PASO_TIEMPO * discretizacion
+    print(len(lista_Qin))
+    for i in range(1, len(lista_Qin)):
+
+        Qin_Ahora = lista_Qin[i]
+
+        if (len(lista_Qin) > i+1):
+            print(i)
+            Qin_Sig = lista_Qin[i+1]
+        else:
+            Qin_Sig = lista_Qin[i]
+
+        # Calcular Qout basado en el nivel de agua H
+        if H_sig <= Hd_RESERVORIO:
+            k1 = Qin_Ahora
+            k2 = Qin_Sig
+            Qout = 0
+        else:
+            print("paso el reservorio en ")
+            h = H_sig - Hd_RESERVORIO
+            Qout = (2 / 3) * CW * LARGO_VERTEDERO * np.sqrt(2 * GRAVEDAD) * h ** (3 / 2)
+            k1 = (Qin_Ahora - Qout)
+            V_sig = V_sig + k1
+            H_sig = V_sig / AREA_RESERVORIO
+
+
+            if (H_sig < Hd_RESERVORIO <= lista_niveles[i-1]):
+
+                k1 = delta_t * Qin_Ahora
+                H_sig = Hd_RESERVORIO
+                V_sig = H_sig * AREA_RESERVORIO
+
+            h_sig = H_sig - Hd_RESERVORIO
+            Qout_sig = (2 / 3) * CW * LARGO_VERTEDERO * np.sqrt(2 * GRAVEDAD) * h_sig ** (3 / 2)
+            k2 = (Qin_Sig - Qout_sig)
+
+        V_result = V_sig + delta_t/2 * (k1 + k2)
+        print(f"{V_result} = {V_sig} + {delta_t/2} * ( {k1} + {k2} )")
+        H_result = V_result / AREA_RESERVORIO
+        print(H_result)
+
+        if H_result < Hd_RESERVORIO <= lista_niveles[i - 1]:
+            H_result = Hd_RESERVORIO
+            V_result = H_result * AREA_RESERVORIO
+
+        V_sig = V_result
+        H_sig = H_result
+        g = calcular_factor_amplificacion(V_sig, delta_t)
+
+
+
+        lista_factores_amplificacion.append(g)
+        lista_volumenes.append(int(V_result))
+        lista_niveles.append(round(H_result,2))
         lista_Qouts.append(Qout)
     return 0
 
@@ -229,6 +291,7 @@ def main ():
     volumenes_solucion_analitica = arreglar_lista_volumenes_solucion_analitica(DISCRETIZACION, volumenes_solucion_analitica)
 
     resolver_euler(horas, volumenes ,niveles_agua, Qouts, Qins, factores_amplificacion, DISCRETIZACION)
+    #resolver_heun(horas, volumenes ,niveles_agua, Qouts, Qins, factores_amplificacion, DISCRETIZACION)
 
     calclcular_errores_truncamiento(volumenes, volumenes_solucion_analitica, errores_truncamiento)
 
