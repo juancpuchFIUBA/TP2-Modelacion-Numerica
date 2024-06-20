@@ -11,7 +11,7 @@ ANCHO_RESERVORIO = 75.0
 AREA_RESERVORIO = LARGO_RESERVORIO * ANCHO_RESERVORIO
 PASO_TIEMPO = 1 * 3600  # Paso de tiempo en segundos (1 hora)
 Hd_RESERVORIO = 15.0
-DISCRETIZACION = 1/60
+DISCRETIZACION = 1/240
 # Leer datos de caudal ingresante (Qin) del archivo
 data = np.loadtxt('Qin.txt', skiprows=1)
 HORA = data[:, 0]
@@ -28,7 +28,8 @@ def resolver_euler(tiempo, lista_volumenes, lista_niveles, lista_Qouts, lista_Qi
     H = H_INICIAL
     V = VOLUMEN_INICIAL
     delta_t = PASO_TIEMPO * discretizacion
-    for i in range(1, len(lista_Qin)):
+
+    for i in range(len(lista_Qin) - 1):
 
         Qin_Ahora = lista_Qin[i]
         # Calcular Qout basado en el nivel de agua H
@@ -72,10 +73,13 @@ def crear_lista_Qin(discretizacion):
     if discretizacion > 1:
         for i in range(0, len(Qin), discretizacion):
             lista_Qin.append(Qin[i])
+
     elif (discretizacion < 1):
-        for i in range(len(Qin)):
+        for i in range(len(Qin) - 1):
+            paso_qin = (Qin[i+1] - Qin[i]) * discretizacion
             for j in range(int(discretizacion**-1)):
-                lista_Qin.append(Qin[i])
+                lista_Qin.append(Qin[i] + paso_qin * j)
+        lista_Qin.append(Qin[i+1])
     else:
         lista_Qin = Qin
     return lista_Qin
@@ -86,12 +90,15 @@ def crear_lista_horas(discretizacion):
         for i in range(0, len(HORA), discretizacion):
             lista_horas.append(HORA[i])
     elif (discretizacion < 1):
-        for i in range(len(HORA)):
+        for i in range(len(HORA) - 1):
             for j in range(int(discretizacion**-1)):
-                lista_horas.append(HORA[i] + discretizacion * j)
+                hora = HORA[i] + discretizacion * j
+                lista_horas.append(hora)
     else:
         lista_horas = HORA
+
     return lista_horas
+
 
 
 def escribir_vector_a_archivo(vector, nombre_archivo):

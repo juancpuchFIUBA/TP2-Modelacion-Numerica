@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import time
 
 # Parámetros
 CW = 1.85
@@ -20,7 +21,7 @@ Hd_RESERVORIO = 15.0
 #Hd_RESERVORIO = 20.0
 #Hd_RESERVORIO = 2.0
 
-DISCRETIZACION = 0.5
+DISCRETIZACION = 4
 
 # Leer datos de caudal ingresante (Qin) del archivo
 data = np.loadtxt('Qin.txt', skiprows=1)
@@ -39,7 +40,8 @@ def resolver_euler(tiempo, lista_volumenes, lista_niveles, lista_Qouts, lista_Qi
     H = H_INICIAL
     V = VOLUMEN_INICIAL
     delta_t = PASO_TIEMPO * discretizacion
-    for i in range(1, len(lista_Qin)):
+
+    for i in range( len(lista_Qin) - 1):
 
         Qin_Ahora = lista_Qin[i]
         # Calcular Qout basado en el nivel de agua H
@@ -49,8 +51,6 @@ def resolver_euler(tiempo, lista_volumenes, lista_niveles, lista_Qouts, lista_Qi
             h = H - Hd_RESERVORIO
             Qout = (2 / 3) * CW * LARGO_VERTEDERO * np.sqrt(2 * GRAVEDAD) * h ** (3 / 2)
 
-
-
         # Actualizar volumen y nivel de agua
         V = V + delta_t * (Qin_Ahora - Qout)
         H = V / AREA_RESERVORIO
@@ -59,9 +59,10 @@ def resolver_euler(tiempo, lista_volumenes, lista_niveles, lista_Qouts, lista_Qi
 
 
         # Una vez lleno, el nivel de agua no puede bajar de 15 m
-        if H < Hd_RESERVORIO <= lista_niveles[i-1]:
+        if H < Hd_RESERVORIO and Qout > 0:
             H = Hd_RESERVORIO
             V = H * AREA_RESERVORIO
+            print('entro')
 
         # Se calcula el factor de amplificacion para analizar estabilidad
         g = calcular_factor_amplificacion(V, delta_t)
@@ -76,13 +77,12 @@ def resolver_heun(tiempo, lista_volumenes, lista_niveles, lista_Qouts, lista_Qin
     H_sig = H_INICIAL
     V_sig = VOLUMEN_INICIAL
     delta_t = PASO_TIEMPO * discretizacion
-    print(len(lista_Qin))
-    for i in range(1, len(lista_Qin)):
+
+    for i in range(len(lista_Qin) - 1):
 
         Qin_Ahora = lista_Qin[i]
 
         if (len(lista_Qin) > i+1):
-            print(i)
             Qin_Sig = lista_Qin[i+1]
         else:
             Qin_Sig = lista_Qin[i]
@@ -90,33 +90,36 @@ def resolver_heun(tiempo, lista_volumenes, lista_niveles, lista_Qouts, lista_Qin
         # Calcular Qout basado en el nivel de agua H
         if H_sig <= Hd_RESERVORIO:
             k1 = Qin_Ahora
-            k2 = Qin_Sig
+            H_sig = (V_sig + delta_t * k1) / AREA_RESERVORIO
+            #Vemos si hay Qout cn la prediccion
+            if H_sig > Hd_RESERVORIO:
+                h_sig = H_sig - Hd_RESERVORIO
+                Qout_sig = (2 / 3) * CW * LARGO_VERTEDERO * np.sqrt(2 * GRAVEDAD) * h_sig ** (3 / 2)
+                k2 = (Qin_Sig - Qout_sig)
+            else:
+                k2 = Qin_Sig
+                Qout_sig = 0
             Qout = 0
+
         else:
-            print("paso el reservorio en ")
             h = H_sig - Hd_RESERVORIO
             Qout = (2 / 3) * CW * LARGO_VERTEDERO * np.sqrt(2 * GRAVEDAD) * h ** (3 / 2)
             k1 = (Qin_Ahora - Qout)
-            V_sig = V_sig + k1
-            H_sig = V_sig / AREA_RESERVORIO
+            H_sig = ((V_sig + delta_t * k1) / AREA_RESERVORIO)
 
-
-            if (H_sig < Hd_RESERVORIO <= lista_niveles[i-1]):
-
-                k1 = delta_t * Qin_Ahora
+            if (H_sig < Hd_RESERVORIO):
+                k1 = Qin_Ahora
                 H_sig = Hd_RESERVORIO
-                V_sig = H_sig * AREA_RESERVORIO
 
             h_sig = H_sig - Hd_RESERVORIO
             Qout_sig = (2 / 3) * CW * LARGO_VERTEDERO * np.sqrt(2 * GRAVEDAD) * h_sig ** (3 / 2)
             k2 = (Qin_Sig - Qout_sig)
 
-        V_result = V_sig + delta_t/2 * (k1 + k2)
-        print(f"{V_result} = {V_sig} + {delta_t/2} * ( {k1} + {k2} )")
-        H_result = V_result / AREA_RESERVORIO
-        print(H_result)
 
-        if H_result < Hd_RESERVORIO <= lista_niveles[i - 1]:
+        V_result = V_sig + (delta_t/2) * (k1 + k2)
+        H_result = V_result / AREA_RESERVORIO
+
+        if H_result < Hd_RESERVORIO and (Qout > 0 or Qout_sig > 0):
             H_result = Hd_RESERVORIO
             V_result = H_result * AREA_RESERVORIO
 
@@ -124,12 +127,11 @@ def resolver_heun(tiempo, lista_volumenes, lista_niveles, lista_Qouts, lista_Qin
         H_sig = H_result
         g = calcular_factor_amplificacion(V_sig, delta_t)
 
-
-
         lista_factores_amplificacion.append(g)
         lista_volumenes.append(int(V_result))
         lista_niveles.append(round(H_result,2))
         lista_Qouts.append(Qout)
+
     return 0
 
 def calcular_factor_amplificacion(volumen_agua, delta_t):
@@ -144,10 +146,13 @@ def crear_lista_Qin(discretizacion):
     if discretizacion > 1:
         for i in range(0, len(Qin), discretizacion):
             lista_Qin.append(Qin[i])
+
     elif (discretizacion < 1):
-        for i in range(len(Qin)):
+        for i in range(len(Qin) - 1):
+            paso_qin = (Qin[i+1] - Qin[i]) * discretizacion
             for j in range(int(discretizacion**-1)):
-                lista_Qin.append(Qin[i])
+                lista_Qin.append(Qin[i] + paso_qin * j)
+        lista_Qin.append(Qin[i+1])
     else:
         lista_Qin = Qin
     return lista_Qin
@@ -158,9 +163,10 @@ def crear_lista_horas(discretizacion):
         for i in range(0, len(HORA), discretizacion):
             lista_horas.append(HORA[i])
     elif (discretizacion < 1):
-        for i in range(len(HORA)):
+        for i in range(len(HORA) - 1):
             for j in range(int(discretizacion**-1)):
                 lista_horas.append(HORA[i] + discretizacion * j)
+        lista_horas.append(HORA[i+1])
     else:
         lista_horas = HORA
     return lista_horas
@@ -206,6 +212,10 @@ def convertir_a_dataframe(lista_horas, Qin, Qouts, lista_volumenes, lista_nivele
 
 def convertir_a_dataframe_volumenes(lista_horas,lista_volumenes, lista_volumenes_sol_analitica, lista_errores_truncamiento):
     lista_horas_sexagesimal = crear_lista_horas_sexagesimal(lista_horas)
+    print(f"len horas {len(lista_horas_sexagesimal)}")
+    print(f"len volumenes {len(lista_volumenes)}")
+    print(f"len volu anal {len(lista_volumenes_sol_analitica)}")
+    print(f"len error tr  {len(lista_errores_truncamiento)}")
     result_df = pd.DataFrame({
         'Tiempo [hr]': lista_horas_sexagesimal,
         'Vol sol error [m³]': lista_volumenes,
@@ -255,14 +265,14 @@ def graficar_nivel_agua(lista_volumenes, lista_niveles, lista_horas):
 def arreglar_lista_volumenes_solucion_analitica(discretizacion, lista_volumenes_solucion_analitica):
     lista_arreglada_volumenes_solucion_analitica = []
 
-    for i in range(0, len(lista_volumenes_solucion_analitica),int(discretizacion * 60)):
+    for i in range(0, len(lista_volumenes_solucion_analitica) ,int(discretizacion * 240)):
         lista_arreglada_volumenes_solucion_analitica.append(lista_volumenes_solucion_analitica[i])
     return lista_arreglada_volumenes_solucion_analitica
 
 def calclcular_errores_truncamiento(lista_volumenes, lista_volumenes_solucion_analitica, lista_errores_truncamiento):
     for i in range(len(lista_volumenes)):
         if lista_volumenes_solucion_analitica[i] != 0:
-            error = round(abs(lista_volumenes[i] - lista_volumenes_solucion_analitica[i]) / lista_volumenes_solucion_analitica[i], 2)
+            error = round(abs((lista_volumenes_solucion_analitica[i] - lista_volumenes[i]) / lista_volumenes_solucion_analitica[i]), 2)
         else :
             error = 0
         lista_errores_truncamiento.append(error)
@@ -273,6 +283,69 @@ def calcular_error_truncamiento_promedio(errores_truncamiento):
     promedio_error = sum(errores_truncamiento) / len(errores_truncamiento)
 
     print(f"El promedio de error de truncamineto es de {promedio_error * 100:.2f}%")
+    return 0
+
+def evaluar_tiempo_de_ejecucion_Euler (discretizacion, volumen_inicial, h_inicial ,Qout_inicial):
+    volumenes = [volumen_inicial]
+    niveles_agua = [h_inicial]
+    Qouts = [Qout_inicial]
+    Qins = crear_lista_Qin(discretizacion)
+    horas = crear_lista_horas(discretizacion)
+    factores_amplificacion = [0]
+
+    start_time = time.time()
+    resolver_euler(horas, volumenes, niveles_agua, Qouts, Qins, factores_amplificacion, discretizacion)
+    end_time = time.time()
+
+    elapsed_time = end_time - start_time
+    return elapsed_time
+
+
+def evaluar_tiempo_de_ejecucion_Heun(discretizacion, volumen_inicial, h_inicial, Qout_inicial):
+    volumenes = [volumen_inicial]
+    niveles_agua = [h_inicial]
+    Qouts = [Qout_inicial]
+    Qins = crear_lista_Qin(discretizacion)
+    horas = crear_lista_horas(discretizacion)
+    factores_amplificacion = [0]
+
+    start_time = time.time()
+    resolver_euler(horas, volumenes, niveles_agua, Qouts, Qins, factores_amplificacion, discretizacion)
+    end_time = time.time()
+
+    elapsed_time = end_time - start_time
+    return elapsed_time
+
+def graficar_costo_computacional_Euler():
+
+    tiempo_1 = evaluar_tiempo_de_ejecucion_Euler(1, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
+    tiempo_2 = evaluar_tiempo_de_ejecucion_Euler(0.5, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
+    tiempo_3 = evaluar_tiempo_de_ejecucion_Euler(1/3, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
+    tiempo_4 = evaluar_tiempo_de_ejecucion_Euler(0.25, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
+    tiempos = [tiempo_1, tiempo_2, tiempo_3, tiempo_4]
+    etiquetas = ['D = 1', 'D = 0.5', 'D = 1/3', 'D = 0.25']
+    plt.bar(etiquetas, tiempos)
+    plt.xlabel('Discretizacion')
+    plt.ylabel('Tiempo de Ejecucion (segs)')
+    plt.title('Costo Computacional - Metodo de Euler')
+
+    plt.show()
+    return 0
+
+
+def graficar_costo_computacional_Heun():
+    tiempo_1 = evaluar_tiempo_de_ejecucion_Heun(1, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
+    tiempo_2 = evaluar_tiempo_de_ejecucion_Heun(0.5, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
+    tiempo_3 = evaluar_tiempo_de_ejecucion_Heun(1 / 3, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
+    tiempo_4 = evaluar_tiempo_de_ejecucion_Heun(0.25, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
+    tiempos = [tiempo_1, tiempo_2, tiempo_3, tiempo_4]
+    etiquetas = ['D = 1', 'D = 0.5', 'D = 1/3', 'D = 0.25']
+    plt.bar(etiquetas, tiempos)
+    plt.xlabel('Discretizacion')
+    plt.ylabel('Tiempo de Ejecucion (segs)')
+    plt.title('Costo Computacional - Metodo de Heun')
+
+    plt.show()
     return 0
 
 
@@ -290,6 +363,7 @@ def main ():
     leer_vector_desde_archivo(PATH_SOLUCION_ANALITICA, volumenes_solucion_analitica)
     volumenes_solucion_analitica = arreglar_lista_volumenes_solucion_analitica(DISCRETIZACION, volumenes_solucion_analitica)
 
+
     resolver_euler(horas, volumenes ,niveles_agua, Qouts, Qins, factores_amplificacion, DISCRETIZACION)
     #resolver_heun(horas, volumenes ,niveles_agua, Qouts, Qins, factores_amplificacion, DISCRETIZACION)
 
@@ -301,8 +375,10 @@ def main ():
     mostrar_data_frame(data_frame2)
 
     calcular_error_truncamiento_promedio(errores_truncamiento)
-
     graficar_nivel_agua(volumenes, niveles_agua, horas)
+
+    #graficar_costo_computacional_Euler()
+    #graficar_costo_computacional_Heun()
 
 
 main()
