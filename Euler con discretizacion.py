@@ -19,9 +19,10 @@ PASO_TIEMPO = 1 * 3600  # Paso de tiempo en segundos (1 hora)
 
 Hd_RESERVORIO = 15.0
 #Hd_RESERVORIO = 20.0
-#Hd_RESERVORIO = 2.0
+#Hd_RESERVORIO = 2.00
+#Hd_RESERVORIO = 7.00
 
-DISCRETIZACION = 4
+DISCRETIZACION = 1/12
 
 # Leer datos de caudal ingresante (Qin) del archivo
 data = np.loadtxt('Qin.txt', skiprows=1)
@@ -62,7 +63,6 @@ def resolver_euler(tiempo, lista_volumenes, lista_niveles, lista_Qouts, lista_Qi
         if H < Hd_RESERVORIO and Qout > 0:
             H = Hd_RESERVORIO
             V = H * AREA_RESERVORIO
-            print('entro')
 
         # Se calcula el factor de amplificacion para analizar estabilidad
         g = calcular_factor_amplificacion(V, delta_t)
@@ -212,10 +212,6 @@ def convertir_a_dataframe(lista_horas, Qin, Qouts, lista_volumenes, lista_nivele
 
 def convertir_a_dataframe_volumenes(lista_horas,lista_volumenes, lista_volumenes_sol_analitica, lista_errores_truncamiento):
     lista_horas_sexagesimal = crear_lista_horas_sexagesimal(lista_horas)
-    print(f"len horas {len(lista_horas_sexagesimal)}")
-    print(f"len volumenes {len(lista_volumenes)}")
-    print(f"len volu anal {len(lista_volumenes_sol_analitica)}")
-    print(f"len error tr  {len(lista_errores_truncamiento)}")
     result_df = pd.DataFrame({
         'Tiempo [hr]': lista_horas_sexagesimal,
         'Vol sol error [m³]': lista_volumenes,
@@ -225,8 +221,6 @@ def convertir_a_dataframe_volumenes(lista_horas,lista_volumenes, lista_volumenes
     return result_df
 def mostrar_data_frame(result_df):
     print("\n \n")
-
-    # Mostrar el DataFrame completo
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_columns', None)
     pd.set_option('display.width', None)
@@ -317,13 +311,25 @@ def evaluar_tiempo_de_ejecucion_Heun(discretizacion, volumen_inicial, h_inicial,
     return elapsed_time
 
 def graficar_costo_computacional_Euler():
-
-    tiempo_1 = evaluar_tiempo_de_ejecucion_Euler(1, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
-    tiempo_2 = evaluar_tiempo_de_ejecucion_Euler(0.5, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
-    tiempo_3 = evaluar_tiempo_de_ejecucion_Euler(1/3, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
-    tiempo_4 = evaluar_tiempo_de_ejecucion_Euler(0.25, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
-    tiempos = [tiempo_1, tiempo_2, tiempo_3, tiempo_4]
-    etiquetas = ['D = 1', 'D = 0.5', 'D = 1/3', 'D = 0.25']
+    tiempos_1 = []
+    tiempos_2 = []
+    tiempos_3 = []
+    tiempos_4 = []
+    for i in range(100):
+        tiempo_1 = evaluar_tiempo_de_ejecucion_Euler(4, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
+        tiempo_2 = evaluar_tiempo_de_ejecucion_Euler(0.5, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
+        tiempo_3 = evaluar_tiempo_de_ejecucion_Euler(0.25, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
+        tiempo_4 = evaluar_tiempo_de_ejecucion_Euler(1/12, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
+        tiempos_1.append(tiempo_1)
+        tiempos_2.append(tiempo_2)
+        tiempos_3.append(tiempo_3)
+        tiempos_4.append(tiempo_4)
+    tiempo_promedio_1 = sum(tiempos_1)/len(tiempos_1)
+    tiempo_promedio_2 = sum(tiempos_2)/len(tiempos_2)
+    tiempo_promedio_3 = sum(tiempos_3)/len(tiempos_3)
+    tiempo_promedio_4 = sum(tiempos_4)/len(tiempos_4)
+    tiempos = [tiempo_promedio_1, tiempo_promedio_2, tiempo_promedio_3, tiempo_promedio_4]
+    etiquetas = ['D = 4', 'D = 0.5', 'D = 0.25', 'D = 1/12']
     plt.bar(etiquetas, tiempos)
     plt.xlabel('Discretizacion')
     plt.ylabel('Tiempo de Ejecucion (segs)')
@@ -334,12 +340,25 @@ def graficar_costo_computacional_Euler():
 
 
 def graficar_costo_computacional_Heun():
-    tiempo_1 = evaluar_tiempo_de_ejecucion_Heun(1, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
-    tiempo_2 = evaluar_tiempo_de_ejecucion_Heun(0.5, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
-    tiempo_3 = evaluar_tiempo_de_ejecucion_Heun(1 / 3, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
-    tiempo_4 = evaluar_tiempo_de_ejecucion_Heun(0.25, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
-    tiempos = [tiempo_1, tiempo_2, tiempo_3, tiempo_4]
-    etiquetas = ['D = 1', 'D = 0.5', 'D = 1/3', 'D = 0.25']
+    tiempos_1 = []
+    tiempos_2 = []
+    tiempos_3 = []
+    tiempos_4 = []
+    for i in range(100):
+        tiempo_1 = evaluar_tiempo_de_ejecucion_Heun(4, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
+        tiempo_2 = evaluar_tiempo_de_ejecucion_Heun(0.5, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
+        tiempo_3 = evaluar_tiempo_de_ejecucion_Heun(0.25, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
+        tiempo_4 = evaluar_tiempo_de_ejecucion_Heun(1/12, VOLUMEN_INICIAL, H_INICIAL, Qout_INICIAL)
+        tiempos_1.append(tiempo_1)
+        tiempos_2.append(tiempo_2)
+        tiempos_3.append(tiempo_3)
+        tiempos_4.append(tiempo_4)
+    tiempo_promedio_1 = sum(tiempos_1) / len(tiempos_1)
+    tiempo_promedio_2 = sum(tiempos_2) / len(tiempos_2)
+    tiempo_promedio_3 = sum(tiempos_3) / len(tiempos_3)
+    tiempo_promedio_4 = sum(tiempos_4) / len(tiempos_4)
+    tiempos = [tiempo_promedio_1, tiempo_promedio_2, tiempo_promedio_3, tiempo_promedio_4]
+    etiquetas = ['D = 4', 'D = 0.5', 'D = 0.25', 'D = 1/12']
     plt.bar(etiquetas, tiempos)
     plt.xlabel('Discretizacion')
     plt.ylabel('Tiempo de Ejecucion (segs)')
@@ -364,8 +383,8 @@ def main ():
     volumenes_solucion_analitica = arreglar_lista_volumenes_solucion_analitica(DISCRETIZACION, volumenes_solucion_analitica)
 
 
-    resolver_euler(horas, volumenes ,niveles_agua, Qouts, Qins, factores_amplificacion, DISCRETIZACION)
-    #resolver_heun(horas, volumenes ,niveles_agua, Qouts, Qins, factores_amplificacion, DISCRETIZACION)
+    #resolver_euler(horas, volumenes ,niveles_agua, Qouts, Qins, factores_amplificacion, DISCRETIZACION)
+    resolver_heun(horas, volumenes ,niveles_agua, Qouts, Qins, factores_amplificacion, DISCRETIZACION)
 
     calclcular_errores_truncamiento(volumenes, volumenes_solucion_analitica, errores_truncamiento)
 
